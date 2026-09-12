@@ -72,7 +72,7 @@ export class PropertiesPanel {
 		this.focusLabelOnBuild = true;
 	}
 
-	refresh(): HTMLInputElement | null {
+	refresh(): HTMLTextAreaElement | null {
 		this.sectionParent = null;
 		const canvas = this.getCanvas();
 		const model = this.getModel();
@@ -125,9 +125,9 @@ export class PropertiesPanel {
 		return null;
 	}
 
-	/** Returns the label input so the coordinator can focus it for F2. */
-	getLabelInput(): HTMLInputElement | null {
-		return this.panelEl.querySelector<HTMLInputElement>("input[type=text]");
+	/** Returns the label textarea so the coordinator can focus it for F2. */
+	getLabelInput(): HTMLTextAreaElement | null {
+		return this.panelEl.querySelector<HTMLTextAreaElement>("textarea.mermaid-flow-textarea");
 	}
 
 	// --- multi-select batch panel -------------------------------------------
@@ -352,7 +352,7 @@ export class PropertiesPanel {
 
 	// --- node panel ---------------------------------------------------------
 
-	private buildNodePanel(id: string, model: DiagramModel): HTMLInputElement | null {
+	private buildNodePanel(id: string, model: DiagramModel): HTMLTextAreaElement | null {
 		const node = model.nodes.find((n) => n.id === id);
 		if (!node) return null;
 
@@ -638,17 +638,44 @@ export class PropertiesPanel {
 		label: string,
 		value: string,
 		onInput: (value: string) => void,
-	): HTMLInputElement {
+	): HTMLTextAreaElement {
 		const field = this.panelEl.createDiv({ cls: "mermaid-flow-field" });
 		field.createEl("label", { text: label });
-		const input = field.createEl("input", { type: "text", cls: "mermaid-flow-input" });
-		input.value = value;
-		input.addEventListener("input", () => onInput(input.value));
+		const textarea = field.createEl("textarea", { cls: "mermaid-flow-textarea" });
+		textarea.value = value;
+		textarea.rows = 1;
+		
+		// Auto-resize textarea based on content
+		const autoResize = () => {
+			textarea.style.height = "auto";
+			textarea.style.height = textarea.scrollHeight + "px";
+		};
+		
+		// Initial resize synchronously to avoid visual jump
+		autoResize();
+		
+		textarea.addEventListener("input", () => {
+			autoResize();
+			onInput(textarea.value);
+		});
+		
+		// Handle Enter key: plain Enter commits, Shift+Enter adds newline
+		textarea.addEventListener("keydown", (e) => {
+			if (e.key === "Enter" && !e.shiftKey) {
+				e.preventDefault();
+				textarea.blur(); // Commit the change
+			}
+		});
+		
 		if (this.focusLabelOnBuild) {
 			this.focusLabelOnBuild = false;
-			window.setTimeout(() => { input.focus(); input.select(); }, 0);
+			window.setTimeout(() => { 
+				textarea.focus(); 
+				textarea.select();
+			}, 0);
 		}
-		return input;
+		
+		return textarea;
 	}
 
 	/** Node hyperlink: a free-text target plus a note picker and an open button. */

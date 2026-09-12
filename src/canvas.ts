@@ -1040,7 +1040,8 @@ export class DiagramCanvas {
 					"dy",
 					String(i === 0 ? -((lines.length - 1) / 2) * lineHeight : lineHeight),
 				);
-				this.appendInlineRuns(tspan, line);
+				// Empty lines need a non-breaking space to preserve vertical spacing
+				this.appendInlineRuns(tspan, line || "\u00A0");
 				text.appendChild(tspan);
 			});
 		}
@@ -1341,20 +1342,46 @@ export class DiagramCanvas {
 		const fontSize = edge.style?.fontSize ?? 11;
 		const g = activeDocument.createElementNS(SVG_NS, "g");
 		const rect = activeDocument.createElementNS(SVG_NS, "rect");
-		const approxW = measureTextWidth(plainTextFromMarkup(label), `${fontSize}px sans-serif`) + 12;
-		const half = fontSize * 0.85;
+		
+		// Support multi-line edge labels
+		const lines = label.split("\n");
+		const lineHeight = fontSize * 1.2;
+		const maxLineWidth = Math.max(
+			...lines.map(line => measureTextWidth(plainTextFromMarkup(line), `${fontSize}px sans-serif`))
+		);
+		const approxW = maxLineWidth + 12;
+		const approxH = lines.length * lineHeight + 8;
+		
 		rect.setAttribute("x", String(x - approxW / 2));
-		rect.setAttribute("y", String(y - half));
+		rect.setAttribute("y", String(y - approxH / 2));
 		rect.setAttribute("width", String(approxW));
-		rect.setAttribute("height", String(half * 2));
+		rect.setAttribute("height", String(approxH));
 		rect.classList.add("mermaid-flow-edge-label-bg");
+		
 		const text = activeDocument.createElementNS(SVG_NS, "text");
 		text.setAttribute("x", String(x));
 		text.setAttribute("y", String(y));
 		text.setAttribute("text-anchor", "middle");
 		text.setAttribute("dominant-baseline", "central");
 		text.classList.add("mermaid-flow-edge-label");
-		this.appendInlineRuns(text, label);
+		
+		// Render multi-line labels with tspans
+		if (lines.length <= 1) {
+			this.appendInlineRuns(text, label);
+		} else {
+			lines.forEach((line, i) => {
+				const tspan = activeDocument.createElementNS(SVG_NS, "tspan");
+				tspan.setAttribute("x", String(x));
+				tspan.setAttribute(
+					"dy",
+					String(i === 0 ? -((lines.length - 1) / 2) * lineHeight : lineHeight),
+				);
+				// Empty lines need a non-breaking space to preserve vertical spacing
+				this.appendInlineRuns(tspan, line || "\u00A0");
+				text.appendChild(tspan);
+			});
+		}
+		
 		if (edge.style?.textColor) text.setAttribute("fill", edge.style.textColor);
 		if (edge.style?.fontSize) text.setAttribute("font-size", `${edge.style.fontSize}px`);
 		g.appendChild(rect);
