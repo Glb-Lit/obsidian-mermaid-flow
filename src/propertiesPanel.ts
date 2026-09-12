@@ -7,11 +7,13 @@ import {
 	DiagramEdge,
 	DiagramModel,
 	DiagramNode,
+	DiagramGroup,
 	EDGE_KINDS,
 	EDGE_LABELS,
 	NODE_SHAPES,
 	SHAPE_LABELS,
 	assignNodeToGroup,
+	canBeParentOf,
 	groupOf,
 	hasEdgeStyle,
 	hasStyle,
@@ -343,6 +345,7 @@ export class PropertiesPanel {
 			this.ops.render();
 			this.ops.commit();
 		});
+		this.buildGroupParentField(group, model);
 		this.panelEl.createDiv({
 			cls: "mermaid-flow-hint",
 			text: "Drag the title bar to move the whole group. Assign more nodes from each node's panel.",
@@ -468,6 +471,38 @@ export class PropertiesPanel {
 				assignNodeToGroup(model, node.id, id);
 			} else {
 				assignNodeToGroup(model, node.id, v === "__none__" ? null : v);
+			}
+			this.ops.render();
+			this.ops.commit();
+			this.refresh();
+		});
+	}
+
+	/** Parent subgraph selector for a subgraph (nested subgraphs). */
+	private buildGroupParentField(group: DiagramGroup, model: DiagramModel): void {
+		const field = this.panelEl.createDiv({ cls: "mermaid-flow-field" });
+		field.createEl("label", { text: "Parent subgraph" });
+		const select = field.createEl("select", { cls: "dropdown mermaid-flow-input" });
+		
+		// Add "(none)" option for root-level subgraphs
+		const noneOption = select.createEl("option", { text: "(none)", value: "__none__" });
+		if (!group.parentId) noneOption.selected = true;
+		
+		// Add all valid parent candidates (excluding self and descendants)
+		for (const g of model.groups) {
+			if (g.id === group.id) continue; // Skip self
+			if (!canBeParentOf(model, g.id, group.id)) continue; // Skip descendants
+			
+			const option = select.createEl("option", { text: g.title || g.id, value: g.id });
+			if (group.parentId === g.id) option.selected = true;
+		}
+		
+		select.addEventListener("change", () => {
+			const v = select.value;
+			if (v === "__none__") {
+				delete group.parentId;
+			} else {
+				group.parentId = v;
 			}
 			this.ops.render();
 			this.ops.commit();
